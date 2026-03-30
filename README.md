@@ -1,3 +1,3 @@
-# mindmate2
+# mindmate
 
-A new Flutter project.
+An AI-Powered Mental Health Companion with Mood Tracking and Personalized Wellness Support
