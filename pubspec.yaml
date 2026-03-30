@@ -1,7 +1,7 @@
 name: mindmate
-description: "A new Flutter project."
+description: "A mental health companion app."
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.9.0 <4.0.0"
@@ -24,12 +24,16 @@ dependencies:
   http: ^1.2.3
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  flutter_secure_storage: ^9.2.4
+  mailer: ^6.6.0
+  flutter_secure_storage: ^10.0.0
   crypto: ^3.0.6
   uuid: ^4.5.1
   connectivity_plus: ^7.0.0
   image_picker: ^1.2.0
   flutter_launcher_icons: ^0.14.4
+  package_info_plus: ^9.0.0
+  url_launcher: ^6.3.2
+  onnxruntime: ^1.4.1
 
 flutter_launcher_icons:
   android: true

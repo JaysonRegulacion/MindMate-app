@@ -2,12 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
 
-enum MoodCategory { positive, neutral, negative }
+enum MoodPolarity { positive, neutral, negative }
 
-MoodCategory getCategory(int value) {
-  if (value >= 5) return MoodCategory.positive;
-  if (value == 4) return MoodCategory.neutral;
-  return MoodCategory.negative;
+MoodPolarity getMoodPolarity(String emotion) {
+  switch (emotion.toLowerCase()) {
+    case 'happy':
+    case 'surprise':
+      return MoodPolarity.positive;
+
+    case 'neutral':
+      return MoodPolarity.neutral;
+
+    case 'angry':
+    case 'disgust':
+    case 'fear':
+    case 'sad':
+      return MoodPolarity.negative;
+
+    default:
+      return MoodPolarity.neutral;
+  }
 }
 
 extension IterableNumExt on Iterable<num> {
@@ -74,9 +88,8 @@ class MoodSummary {
     return "Negative";
   }
 
-  Map<String, int> getTimeGroupCount({int threshold = 4}) {
-    final positiveMoods = parsedMoods.where((m) => getValue<int>(m, 'value', 0) >= threshold);
-    return positiveMoods
+  Map<String, int> getTimeGroupCount() {
+    return parsedMoods
         .groupListsBy((m) =>
             _getTimeOfDayLabel(getValue<DateTime>(m, 'parsed_date', DateTime.now())))
         .map((k, v) => MapEntry(k, v.length));
@@ -101,23 +114,6 @@ class MoodSummary {
         (getValue<int>(a, 'value', 0) < getValue<int>(b, 'value', 0)) ? a : b);
   }
 
-  String get trend {
-    if (parsedMoods.length < 2) return 'stable';
-    final firstHalf = parsedMoods
-        .take(parsedMoods.length ~/ 2)
-        .map((m) => getValue<int>(m, 'value', 0));
-    final secondHalf = parsedMoods
-        .skip(parsedMoods.length ~/ 2)
-        .map((m) => getValue<int>(m, 'value', 0));
-
-    final avgFirst = firstHalf.average;
-    final avgLast = secondHalf.average;
-
-    if (avgFirst < avgLast) return 'up';
-    if (avgFirst > avgLast) return 'down';
-    return 'stable';
-  }
-
   String formatFor(DateTime time, String filter) =>
       filter == "Today" ? DateFormat('HH:mm').format(time) : DateFormat('EEEE').format(time);
 
@@ -132,20 +128,22 @@ class MoodSummary {
   String suggestion(String Function(String) moodEmoji) {
     if (isEmpty) return "No mood data available for suggestions.";
 
-    getValue<String>(highestMood, 'main_mood', 'mood');
     final dominant = getValue<String>(dominantMood, 'main_mood', 'mood');
     final activeTime = mostFrequentTime.isNotEmpty ? mostFrequentTime : "your usual time";
+    final polarity = getMoodPolarity(dominant);
 
-    switch (trend) {
-      case 'up':
-        return "💡 Great! Your mood is trending upward. Keep doing activities that make you feel ${moodEmoji(dominant)} $dominant, especially during $activeTime.";
-      case 'down':
-        return "💡 Your mood seems to be trending downward. Try relaxing, journaling, or connecting with friends to improve your $dominant mood.";
-      default:
-        return "💡 Your mood is stable. Maintain habits that support ${moodEmoji(dominant)} $dominant and stay positive during $activeTime.";
+    switch (polarity) {
+      case MoodPolarity.positive:
+        return "💡 Great! Your mood is positive. Keep doing activities that make you feel ${moodEmoji(dominant)} $dominant, especially during $activeTime.";
+      case MoodPolarity.neutral:
+        return "💡 Your mood is neutral. Maintain your usual routines and engage in activities that keep you balanced during $activeTime.";
+      case MoodPolarity.negative:
+        return "💡 Your mood seems to be negative. Try relaxing, journaling, or connecting with friends to improve your ${moodEmoji(dominant)} $dominant mood.";
     }
   }
 }
+
+// ------------------------- MoodSummaryCard -------------------------
 
 class MoodSummaryCard extends StatefulWidget {
   final MoodSummary summary;
@@ -178,18 +176,6 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
         getValue<DateTime>(summary.lowestMood, 'parsed_date', DateTime.now()),
         widget.filter);
 
-    final trendIconColor = {
-      "up": Icons.trending_up,
-      "down": Icons.trending_down,
-      "stable": Icons.trending_flat
-    };
-
-    final trendColor = {
-      "up": Colors.green,
-      "down": Colors.red,
-      "stable": Colors.grey
-    };
-
     return Card(
       color: Colors.blue.shade50,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -199,8 +185,6 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildTitle(),
-            const SizedBox(height: 16),
-            _buildTrendRow(trendIconColor[summary.trend]!, trendColor[summary.trend]!),
             const SizedBox(height: 16),
             _buildMoodCards(bestTime, worstTime),
             const SizedBox(height: 16),
@@ -213,30 +197,14 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
     );
   }
 
-  Widget _buildTitle() => Row(
-        children: const [
+  Widget _buildTitle() => const Row(
+        children: [
           Icon(Icons.insights, color: Colors.blue),
           SizedBox(width: 8),
           Text("Mood Summary",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         ],
       );
-
-  Widget _buildTrendRow(IconData icon, Color color) => Row(
-        children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              "Overall, your mood ${_formatTrend(widget.summary.trend)}.",
-              style: const TextStyle(fontSize: 16),
-            ),
-          ),
-        ],
-      );
-
-  String _formatTrend(String trend) =>
-      trend == 'up' ? 'trended upward' : trend == 'down' ? 'trended downward' : 'remained stable';
 
   Widget _buildMoodCards(String bestTime, String worstTime) => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -261,7 +229,9 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
             _buildMoodCard(
                 title: "Active Time",
                 emoji: "🕒",
-                value: widget.summary.mostFrequentTime,
+                value: widget.summary.mostFrequentTime.isNotEmpty
+                  ? widget.summary.mostFrequentTime
+                  : "No pattern yet",
                 color: Colors.orange.shade200),
           ],
         ),
@@ -289,9 +259,8 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
         ),
       );
 
-  /// 🆕 Expandable main + sub mood breakdown
   Widget _buildExpandableMoodBreakdown() {
-    final mainMoods = ["happy", "tired", "anxious", "sad", "angry"];
+    final mainMoods = ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"];
     final moodCounts = <String, int>{};
     final subCounts = <String, Map<String, int>>{};
 
@@ -303,7 +272,7 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
     for (final m in widget.summary.parsedMoods) {
       final main = getValue<String>(m, 'main_mood', '').toLowerCase();
       final sub = getValue<String>(m, 'sub_mood', '').toLowerCase();
-      if (main.isEmpty) continue;
+      if (main.isEmpty || !mainMoods.contains(main)) continue;
       moodCounts[main] = (moodCounts[main] ?? 0) + 1;
       if (sub.isNotEmpty) {
         subCounts[main]![sub] = (subCounts[main]![sub] ?? 0) + 1;
@@ -317,7 +286,8 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("📊 Mood Breakdown", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const Text("📊 Emotion Breakdown",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 12),
         ...sorted.map((entry) {
           final main = entry.key;
@@ -347,7 +317,7 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
                     SizedBox(
                       width: 60,
                       child: Text(
-                        main[0].toUpperCase() + main.substring(1),
+                        main.capitalize(),
                         style: const TextStyle(fontSize: 14),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -413,7 +383,7 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
               ),
             ],
           );
-        })
+        }).toList()
       ],
     );
   }
@@ -422,14 +392,18 @@ class _MoodSummaryCardState extends State<MoodSummaryCard> {
     switch (mood) {
       case 'happy':
         return const LinearGradient(colors: [Colors.green, Colors.greenAccent]);
-      case 'tired':
-        return const LinearGradient(colors: [Colors.blueGrey, Colors.grey]);
-      case 'anxious':
-        return const LinearGradient(colors: [Colors.orange, Colors.deepOrangeAccent]);
+      case 'neutral':
+        return const LinearGradient(colors: [Colors.grey, Colors.blueGrey]);
       case 'angry':
         return const LinearGradient(colors: [Colors.red, Colors.redAccent]);
+      case 'disgust':
+        return const LinearGradient(colors: [Colors.teal, Colors.tealAccent]);
+      case 'fear':
+        return const LinearGradient(colors: [Colors.purple, Colors.deepPurpleAccent]);
       case 'sad':
         return const LinearGradient(colors: [Colors.blue, Colors.lightBlueAccent]);
+      case 'surprise':
+        return const LinearGradient(colors: [Colors.orange, Colors.deepOrangeAccent]);
       default:
         return const LinearGradient(colors: [Colors.grey, Colors.white24]);
     }

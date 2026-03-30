@@ -31,7 +31,9 @@ class _NotificationPermissionPromptState
       curve: Curves.easeInOut,
     );
 
-    _checkAndPrompt();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndPrompt();
+    });
   }
 
   @override
@@ -41,44 +43,44 @@ class _NotificationPermissionPromptState
   }
 
   Future<void> _checkAndPrompt() async {
-    // Check if already prompted
-    final prompted = await UserSession.getFirstTimeNotificationPrompt();
-    if (prompted == true) return;
+    // 1️⃣ Check if prompt already shown
+    final promptShown = await UserSession.isNotificationPromptShown();
+    if (promptShown) return;
 
-    // Check if user has logged a mood at least once
-    final hasMood = await UserSession.hasMoodLogged();
-    if (!hasMood) return;
+    // 2️⃣ Check if user has written at least one journal
+    final hasJournal = await UserSession.hasJournalLogged();
+    if (!hasJournal) return;
 
+    // Small delay for smoother UX
     await Future.delayed(const Duration(milliseconds: 500));
-    
     if (!mounted) return;
 
-    // Start fade-in animation
+    // 3️⃣ Fade-in animation
     _animationController.forward();
 
-    // Show dialog
-    final granted = await _showExplanationDialog();
-    if (granted == true) {
-      // Request system notification permission
-      final permissionGranted = await NotificationService.requestPermission();
+    // 4️⃣ Show explanation dialog
+    final accepted = await _showExplanationDialog();
+
+    if (accepted == true) {
+      final permissionGranted =
+          await NotificationService.requestPermission();
+
       if (permissionGranted == true) {
         await UserSession.saveNotifEnabled(true);
         final firstName = await UserSession.getFirstName();
-        await NotificationService.scheduleDailyReminders(userName: firstName);
-        print("✅ Notifications enabled & reminders scheduled!");
+        await NotificationService.scheduleDailyReminders(
+          userName: firstName,
+        );
+        debugPrint("✅ Notifications enabled & reminders scheduled");
       } else {
         await UserSession.saveNotifEnabled(false);
-        print("⚠️ Notifications denied by system. Toggle remains OFF.");
+        debugPrint("⚠️ Notification permission denied");
       }
     }
 
-    // Mark prompt as shown
-    await UserSession.setFirstTimeNotificationPrompt();
+    // 5️⃣ Mark prompt as shown (ALWAYS, even if declined)
+    await UserSession.setNotificationPromptShown();
 
-    // Close the dialog
-    if (mounted) {
-      Navigator.of(context).pop();
-    }
   }
 
   Future<bool?> _showExplanationDialog() async {

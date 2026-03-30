@@ -25,7 +25,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   // Emergency Contact
   final emergencyNameController = TextEditingController();
   final emergencyRelationshipController = TextEditingController();
-  final emergencyNumberController = TextEditingController();
+  final emergencyEmailController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -58,7 +58,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final username = usernameController.text.trim();
     final emergencyName = capitalizeWords(emergencyNameController.text.trim());
     final emergencyRelationship = capitalize(emergencyRelationshipController.text.trim());
-    final emergencyNumber = emergencyNumberController.text.trim();
+    final emergencyEmail = emergencyEmailController.text.trim();
 
     try {
 
@@ -85,7 +85,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final authResponse = await supabase.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo: 'mindmate://reset',
+        emailRedirectTo: 'mindmate://verify',
         data: {
           'full_name': '$firstName $lastName',
           'first_name': firstName,
@@ -93,7 +93,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           'username': username,
           'emergency_name': emergencyName,
           'emergency_relationship': emergencyRelationship,
-          'emergency_number': emergencyNumber,
+          'emergency_email': emergencyEmail,
         },
       );
 
@@ -210,7 +210,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     usernameController.dispose();
     emergencyNameController.dispose();
     emergencyRelationshipController.dispose();
-    emergencyNumberController.dispose();
+    emergencyEmailController.dispose();
     super.dispose();
   }
 
@@ -374,21 +374,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                                     
                                     CustomTextField(
-                                      controller: emergencyNumberController,
-                                      label: "Contact Number",
-                                      icon: Icons.phone_outlined,
-                                      keyboardType: TextInputType.phone,
+                                      controller: emergencyEmailController, // you can rename this to emergencyEmailController
+                                      label: "Contact Email",
+                                      icon: Icons.email_outlined,
+                                      keyboardType: TextInputType.emailAddress,
                                       validator: (v) {
-                                        if (v == null || v.isEmpty) {
-                                          return 'Enter contact number';
-                                        }
-                                        if (!RegExp(r'^[0-9]{10,15}$').hasMatch(v)) {
-                                          return 'Invalid number';
+                                        if (v == null || v.isEmpty) return 'Enter contact email';
+                                        if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w]{2,4}$').hasMatch(v)) {
+                                          return 'Invalid email';
                                         }
                                         return null;
                                       },
                                     ),
-
                                   ],
                                 ),
                               ),

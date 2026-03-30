@@ -19,12 +19,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _loading = true;
 
-  final TimeOfDay morningStart = const TimeOfDay(hour: 5, minute: 0);
+  final TimeOfDay morningStart = const TimeOfDay(hour: 0, minute: 0);
   final TimeOfDay morningEnd = const TimeOfDay(hour: 11, minute: 59);
   final TimeOfDay afternoonStart = const TimeOfDay(hour: 12, minute: 0);
   final TimeOfDay afternoonEnd = const TimeOfDay(hour: 17, minute: 59);
   final TimeOfDay eveningStart = const TimeOfDay(hour: 18, minute: 0);
-  final TimeOfDay eveningEnd = const TimeOfDay(hour: 21, minute: 59);
+  final TimeOfDay eveningEnd = const TimeOfDay(hour: 23, minute: 59);
 
   @override
   void initState() {
@@ -175,7 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           SwitchListTile(
             title: const Text("Enable Daily Reminders"),
-            subtitle: const Text("Receive notifications to log your mood"),
+            subtitle: const Text("Receive notifications to log your journal"),
             value: isNotificationsEnabled,
             onChanged: (v) => _toggleNotifications(v),
           ),
@@ -205,7 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (reminderMode == "custom") ...[
                   ListTile(
                     title: const Text("Morning Reminder"),
-                    subtitle: Text("${morning.format(context)} • Allowed: 5:00 AM - 11:59 AM"),
+                    subtitle: Text("${morning.format(context)} • Allowed: 12:00 AM - 11:59 AM"),
                     trailing: const Icon(Icons.access_time),
                     onTap: () => _pickTime(
                         current: morning,
@@ -223,7 +223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   ListTile(
                     title: const Text("Evening Reminder"),
-                    subtitle: Text("${evening.format(context)} • Allowed: 6:00 PM - 9:59 PM"),
+                    subtitle: Text("${evening.format(context)} • Allowed: 6:00 PM - 11:59 PM"),
                     trailing: const Icon(Icons.access_time),
                     onTap: () => _pickTime(
                         current: evening,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mindmate/services/user_session.dart';
 import 'package:mindmate/widgets/background.dart';
 import 'package:mindmate/widgets/custom_text_field.dart';
 import 'package:mindmate/widgets/primary_button.dart';
@@ -31,6 +32,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: newPassword),
       );
+
+      await UserSession.clearUserSession();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

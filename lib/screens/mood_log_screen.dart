@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mindmate/screens/all_moods_screen.dart';
 import 'package:mindmate/screens/chat_screen.dart';
@@ -9,6 +10,7 @@ import 'package:mindmate/widgets/moodlogscreen/more_moods_button.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/mood_repository.dart';
 import '../services/connectivity_service.dart';
+import '../services/risk_detection_service.dart';
 
 class MoodLogScreen extends StatefulWidget {
   const MoodLogScreen({super.key});
@@ -26,6 +28,7 @@ class _MoodLogScreenState extends State<MoodLogScreen>
   bool _isOffline = false;
 
   late ConnectivityService _connectivityService;
+  late RiskDetectionService _riskService;
   late AnimationController _buttonController;
   late Animation<double> _buttonScale;
   late AnimationController _tipController;
@@ -36,7 +39,13 @@ class _MoodLogScreenState extends State<MoodLogScreen>
   late Animation<Offset> _promptOffset;
 
   final List<String> _moodEmojis = ["😊", "😴", "😰", "😡", "😔"];
-  final List<String> _moodLabels = ["Happy", "Tired", "Anxious", "Angry", "Sad"];
+  final List<String> _moodLabels = [
+    "Happy",
+    "Tired",
+    "Anxious",
+    "Angry",
+    "Sad"
+  ];
   final supabase = Supabase.instance.client;
   final ScrollController _scrollController = ScrollController();
 
@@ -45,17 +54,21 @@ class _MoodLogScreenState extends State<MoodLogScreen>
     super.initState();
 
     // Animations
-    _buttonController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _buttonController =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
     _buttonScale = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _buttonController, curve: Curves.easeInOut),
     );
-    _tipController = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _tipController =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
     _tipOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(_tipController);
     _tipScale = Tween<double>(begin: 0.8, end: 1.0).animate(_tipController);
-    _promptController = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
-    _promptOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(_promptController);
-    _promptOffset = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
-        CurvedAnimation(parent: _promptController, curve: Curves.easeOut));
+    _promptController =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _promptOpacity =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_promptController);
+    _promptOffset = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _promptController, curve: Curves.easeOut));
 
     // Connectivity Service
     _connectivityService = ConnectivityService(
@@ -70,11 +83,23 @@ class _MoodLogScreenState extends State<MoodLogScreen>
       }) {
         if (mounted) setState(() => _isOffline = isOffline);
       },
-      bannerController: AnimationController(vsync: this, duration: const Duration(milliseconds: 500)),
-      chipController: AnimationController(vsync: this, duration: const Duration(milliseconds: 500)),
+      bannerController:
+          AnimationController(vsync: this, duration: const Duration(milliseconds: 500)),
+      chipController:
+          AnimationController(vsync: this, duration: const Duration(milliseconds: 500)),
     );
-
+    // We start listening but keep callbacks lightweight
     _connectivityService.startListening(onRefreshData: () async {}, onNewTip: (_) {});
+
+    // Initialize RiskDetectionService
+    _riskService = RiskDetectionService(
+      supabase,
+      moodHistoryLimit: 50,
+      journalHistoryLimit: 10,
+      chatHistoryLimit: 30,
+      riskThreshold: 9.0,
+      notificationCooldownMinutes: 1,
+    );
   }
 
   @override
@@ -87,25 +112,91 @@ class _MoodLogScreenState extends State<MoodLogScreen>
     super.dispose();
   }
 
-  /// Save mood (supports main + sub mood)
-  Future<void> _saveMood(String subMood, int mainMoodIndex) async {
-    final tip = MoodTips.getTip(mainMoodIndex);
-    final repo = MoodRepository(supabase);
-    final mainMood = _moodLabels[mainMoodIndex];
+  Future<void> _saveMoodBackground(String subMood, int mainMoodIndex) async {
+    try {
+      final tip = MoodTips.getTip(mainMoodIndex);
+      final repo = MoodRepository(supabase);
+      final mainMood = _moodLabels[mainMoodIndex];
 
-    final entry = await repo.saveMood(
-      mainMood: mainMood,
-      subMood: subMood != mainMood ? subMood : null,
-      tip: tip,
-    );
+      final entry = await repo.saveMood(
+        mainMood: mainMood,
+        subMood: subMood != mainMood ? subMood : null,
+        tip: tip,
+      );
 
+      if (mounted) {
+        setState(() {
+          _moodId = entry['id'];
+        });
+      }
+
+      try {
+        await UserSession.setMoodLogged();
+      } catch (e) {
+        print("⚠️ UserSession.setMoodLogged failed: $e");
+      }
+
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        print("⚠️ No authenticated user for risk detection.");
+        return;
+      }
+
+      final contacts = await supabase
+          .from('emergency_contacts')
+          .select('contact_email')
+          .eq('user_id', currentUser.id);
+
+      final emergencyEmails = (contacts as List)
+          .map((c) => c['contact_email']?.toString())
+          .where((e) => e != null && e.isNotEmpty)
+          .cast<String>()
+          .toList();
+
+      if (emergencyEmails.isNotEmpty) {
+        try {
+          await _riskService.detectAndNotifyMultiple(
+            userId: currentUser.id,
+            userName: currentUser.email ?? "Anonymous",
+            emergencyEmails: emergencyEmails,
+          );
+        } catch (e) {
+          print("⚠️ Risk detection failed: $e");
+        }
+      }
+    } catch (e) {
+      print("❌ _saveMoodBackground error: $e");
+    }
+  }
+
+  void _onMoodTap(String label, int index) {
+    final tip = MoodTips.getTip(index);
     setState(() {
-      _moodId = entry['id'];
+      _selectedMood = index;
+      _selectedSubMood = label;
       _currentTip = tip;
-      _selectedSubMood = subMood;
     });
 
-    await UserSession.setMoodLogged();
+    _buttonController.forward().then((_) => _buttonController.reverse());
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _tipController.forward();
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _promptController.forward();
+      });
+
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    });
+
+    _saveMoodBackground(label, index);
   }
 
   void _openChat() {
@@ -125,18 +216,7 @@ class _MoodLogScreenState extends State<MoodLogScreen>
     final selected = _selectedMood == index;
     return GestureDetector(
       onTap: () async {
-        setState(() {
-          _selectedMood = index;
-          _selectedSubMood = label;
-        });
-        _buttonController.forward().then((_) => _buttonController.reverse());
-        await _saveMood(label, index);
-        await _tipController.forward();
-        await Future.delayed(const Duration(milliseconds: 150));
-        await _promptController.forward();
-        await Future.delayed(const Duration(milliseconds: 300));
-        _scrollController.animateTo(_scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
+        _onMoodTap(label, index);
       },
       child: Semantics(
         label: label,
@@ -145,10 +225,13 @@ class _MoodLogScreenState extends State<MoodLogScreen>
         child: Column(
           children: [
             ScaleTransition(
-              scale: selected ? _buttonScale : const AlwaysStoppedAnimation(1.0),
+              scale: selected
+                  ? _buttonScale
+                  : const AlwaysStoppedAnimation(1.0),
               child: CircleAvatar(
                 radius: 36,
-                backgroundColor: selected ? const Color(0xFF50C9C3) : Colors.grey[200],
+                backgroundColor:
+                    selected ? const Color(0xFF50C9C3) : Colors.grey[200],
                 child: Text(emoji, style: const TextStyle(fontSize: 34)),
               ),
             ),
@@ -157,8 +240,11 @@ class _MoodLogScreenState extends State<MoodLogScreen>
               label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                color: selected ? Colors.black87 : Colors.black54,
+                fontWeight:
+                    selected ? FontWeight.bold : FontWeight.normal,
+                color: selected
+                    ? const Color.fromARGB(221, 8, 5, 5)
+                    : Colors.black54,
               ),
             ),
           ],
@@ -270,34 +356,60 @@ class _MoodLogScreenState extends State<MoodLogScreen>
                           builder: (_) => const AllMoodsScreen()));
                   if (selectedMood != null) {
                     int moodIndex = 0;
-                    if (["Excited","Joyful","Content","Loved","Proud","Grateful","Motivated","Delighted"].contains(selectedMood)) moodIndex = 0;
-                    else if (["Sleepy","Drained","Exhausted","Unfocused","Lazy","Overwhelmed","Unmotivated"].contains(selectedMood)) moodIndex = 1;
-                    else if (["Worried","Stressed","Nervous","Panicked","Tense","Insecure","Overthinking"].contains(selectedMood)) moodIndex = 2;
-                    else if (["Annoyed","Frustrated","Irritated","Bitter","Furious","Upset","Resentful"].contains(selectedMood)) moodIndex = 3;
-                    else if (["Lonely","Heartbroken","Disappointed","Gloomy","Hopeless","Depressed","Empty"].contains(selectedMood)) moodIndex = 4;
+                    if ([
+                      "Excited",
+                      "Joyful",
+                      "Content",
+                      "Loved",
+                      "Proud",
+                      "Grateful",
+                      "Motivated",
+                      "Delighted"
+                    ].contains(selectedMood)) moodIndex = 0;
+                    else if ([
+                      "Sleepy",
+                      "Drained",
+                      "Exhausted",
+                      "Unfocused",
+                      "Lazy",
+                      "Overwhelmed",
+                      "Unmotivated"
+                    ].contains(selectedMood)) moodIndex = 1;
+                    else if ([
+                      "Worried",
+                      "Stressed",
+                      "Nervous",
+                      "Panicked",
+                      "Tense",
+                      "Insecure",
+                      "Overthinking"
+                    ].contains(selectedMood)) moodIndex = 2;
+                    else if ([
+                      "Annoyed",
+                      "Frustrated",
+                      "Irritated",
+                      "Bitter",
+                      "Furious",
+                      "Upset",
+                      "Resentful"
+                    ].contains(selectedMood)) moodIndex = 3;
+                    else if ([
+                      "Lonely",
+                      "Heartbroken",
+                      "Disappointed",
+                      "Gloomy",
+                      "Hopeless",
+                      "Depressed",
+                      "Empty"
+                    ].contains(selectedMood)) moodIndex = 4;
 
-                    setState(() {
-                      _selectedMood = moodIndex;
-                      _selectedSubMood = selectedMood;
-                    });
-                    await _saveMood(selectedMood, moodIndex);
-                    await _tipController.forward();
-                    await Future.delayed(const Duration(milliseconds: 150));
-                    await _promptController.forward();
-                    await Future.delayed(const Duration(milliseconds: 300));
-                    
-                    _scrollController.animateTo(
-                      _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOut,
-                    );
+                    _onMoodTap(selectedMood, moodIndex);
                   }
                 },
               ),
 
               const SizedBox(height: 40),
 
-              // Mood Tip
               if (_selectedMood != null && _currentTip != null)
                 FadeTransition(
                   opacity: _tipOpacity,
@@ -333,7 +445,6 @@ class _MoodLogScreenState extends State<MoodLogScreen>
                   ),
                 ),
 
-              // Mood Prompt
               if (_selectedMood != null && _selectedSubMood != null)
                 SlideTransition(
                   position: _promptOffset,
@@ -349,8 +460,10 @@ class _MoodLogScreenState extends State<MoodLogScreen>
                                   mainMood: _moodLabels[_selectedMood!],
                                   subMood: _selectedSubMood!,
                                   note: note);
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                  content: Text("Your note was saved locally!")));
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                    content: Text("Your note was saved locally!")));
+                              }
                             }
                           : null,
                     ),

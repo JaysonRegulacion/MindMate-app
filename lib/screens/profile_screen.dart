@@ -24,7 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfileData();
   }
 
-  /// Fetch all data for the profile screen
   Future<void> _loadProfileData() async {
     setState(() => isLoading = true);
 
@@ -33,7 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _service.fetchUserProfile(),
         _service.fetchAverageMoodThisWeek(),
         _service.fetchTotalMoodLogs(),
-        _service.fetchAllMoods(), // fetch all moods to calculate streak
+        _service.fetchAllMoods(),
         _service.fetchEmergencyContacts(),
       ]);
 
@@ -43,7 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         profile = results[0] as Map<String, dynamic>?;
         avgMood = results[1] as double;
         totalLogs = results[2] as int;
-        longestStreak = _calculateStreak(allMoods); // streak logic here
+        longestStreak = _calculateStreak(allMoods);
         emergencyContacts = results[4] as List<Map<String, dynamic>>;
         isLoading = false;
       });
@@ -58,7 +57,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Calculate streak based on consecutive days with moods logged
   int _calculateStreak(List<Map<String, dynamic>> moods) {
     if (moods.isEmpty) return 0;
 
@@ -69,11 +67,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         })
         .toSet()
         .toList()
-      ..sort((a, b) => b.compareTo(a)); // latest first
+      ..sort((a, b) => b.compareTo(a));
 
     final today = DateTime.now();
     DateTime currentDay = uniqueDays.first;
-
     int streak = 0;
 
     for (int i = 0; i < uniqueDays.length; i++) {
@@ -102,6 +99,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.black87,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Profile",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
+      extendBodyBehindAppBar: true,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Container(
@@ -117,31 +129,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: SafeArea(
                 child: RefreshIndicator(
                   onRefresh: _loadProfileData,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(20),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight,
-                          ),
-                          child: IntrinsicHeight(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                _buildProfileHeader(),
-                                const SizedBox(height: 20),
-                                _buildEmergencyContacts(),
-                                const SizedBox(height: 30),
-                                _buildStatsCards(),
-                                const Spacer(),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _buildProfileHeader(),
+                        const SizedBox(height: 20),
+                        _buildEmergencyContacts(),
+                        const SizedBox(height: 30),
+                        _buildStatsCards(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -213,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _statCard(String title, String value, IconData icon) {
-    double width = MediaQuery.of(context).size.width / 3.5;
+    double width = (MediaQuery.of(context).size.width - 60) / 3;
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -260,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   leading: const Icon(Icons.contact_phone, color: Colors.teal),
                   title: Text(c['name']),
                   subtitle:
-                      Text("${c['relationship']} • ${c['phone_number']}"),
+                      Text("${c['relationship']} • ${c['contact_email']}"),
                 ),
               );
             }).toList(),

@@ -11,6 +11,15 @@ class HomeMoodController {
 
   HomeMoodController(this.repo);
 
+  Future<void> fetchRecentMoods() async {
+    recentMoods = await repo.fetchRecentMoods(days: 7);
+
+    // Sort ascending for trend chart
+    recentMoods.sort((a, b) =>
+        DateTime.parse(a['created_at']).compareTo(DateTime.parse(b['created_at'])));
+  }
+
+
   /// Fetch all moods from the database
   Future<void> fetchAllMoods() async {
     allMoods = await repo.fetchMoods();

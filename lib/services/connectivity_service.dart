@@ -28,6 +28,8 @@ class ConnectivityService {
     required this.chipController,
   });
 
+  set onStateChangeCallback(Null Function(dynamic isOffline, dynamic _, dynamic __, dynamic ___, dynamic ____, dynamic _____) onStateChangeCallback) {}
+
   /// Start listening for connectivity changes and check initial state.
   void startListening({
     required Future<void> Function() onRefreshData,
@@ -89,7 +91,7 @@ class ConnectivityService {
           showChip: false,
           showOnlineBanner: true,
           bannerIcon: Icons.sync,
-          bannerMessage: "Back online! Syncing your moods...",
+          bannerMessage: "Back online! Syncing your moods and journals...",
         );
         await bannerController.forward();
 

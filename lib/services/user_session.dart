@@ -78,15 +78,46 @@ class UserSession {
     return box.get('isLoggedIn', defaultValue: false);
   }
 
+  /// Clear all saved user session data (for logout or password reset)
+  static Future<void> clearUserSession() async {
+    var box = await _getBox();
+
+    // Delete only user-related keys
+    await box.delete('userId');
+    await box.delete('email');
+    await box.delete('password');
+    await box.delete('isLoggedIn');
+    await box.delete('expiry');
+    await box.delete('firstName');
+    await box.delete('firstNameExpiry');
+
+    print("🗑️ User session cleared");
+  }
+
   /// -------------------------------
-  /// 🔔 First-time notification prompt
+  /// 📓 First journal notification logic
   /// -------------------------------
-  static Future<void> setFirstTimeNotificationPrompt() async {
+
+  /// Mark that the user has logged at least one journal
+  static Future<void> setFirstJournalLogged() async {
+    var box = await _getBox();
+    await box.put('hasJournalLogged', true);
+  }
+
+  /// Check if user has logged at least one journal
+  static Future<bool> hasJournalLogged() async {
+    var box = await _getBox();
+    return box.get('hasJournalLogged', defaultValue: false);
+  }
+
+  /// Mark notification prompt as shown
+  static Future<void> setNotificationPromptShown() async {
     var box = await _getBox();
     await box.put('notificationPromptShown', true);
   }
 
-  static Future<bool> getFirstTimeNotificationPrompt() async {
+  /// Check if notification prompt was already shown
+  static Future<bool> isNotificationPromptShown() async {
     var box = await _getBox();
     return box.get('notificationPromptShown', defaultValue: false);
   }

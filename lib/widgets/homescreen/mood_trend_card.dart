@@ -20,13 +20,12 @@ class MoodTrendCard extends StatefulWidget {
   });
 
   @override
-  _MoodTrendCardState createState() => _MoodTrendCardState();
+  State<MoodTrendCard> createState() => _MoodTrendCardState();
 }
 
 class _MoodTrendCardState extends State<MoodTrendCard> {
   int trendIndex = 0;
-  Map<String, int> previousCounts = {};
-  Set<String> expandedMoods = {}; // Tracks which main moods are expanded
+  Set<String> expandedMoods = {};
 
   @override
   void initState() {
@@ -37,16 +36,12 @@ class _MoodTrendCardState extends State<MoodTrendCard> {
   @override
   void didUpdateWidget(MoodTrendCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    previousCounts = _getMoodCounts(oldWidget.moods);
-
     if (oldWidget.selectedTrendIndex != widget.selectedTrendIndex) {
-      setState(() => trendIndex = widget.selectedTrendIndex);
-    }
-
-    if (oldWidget.isOffline != widget.isOffline) {
-      setState(() {});
+      trendIndex = widget.selectedTrendIndex;
     }
   }
+
+  // ---------------- FILTER ----------------
 
   List<Map<String, dynamic>> _applyCardFilter() {
     final now = DateTime.now();
@@ -66,13 +61,29 @@ class _MoodTrendCardState extends State<MoodTrendCard> {
     }
   }
 
+  // ---------------- COUNTS ----------------
+
   Map<String, int> _getMoodCounts(List<Map<String, dynamic>> moods) {
     final counts = <String, int>{};
-    final mainMoods = ['happy', 'tired', 'anxious', 'sad', 'angry'];
-    for (var mood in mainMoods) counts[mood] = 0;
+    final mainMoods = [
+      'angry',
+      'disgust',
+      'fear',
+      'happy',
+      'neutral',
+      'sad',
+      'surprise',
+    ];
+
+    for (final mood in mainMoods) {
+      counts[mood] = 0;
+    }
+
     for (final m in moods) {
-      final mood = (m['main_mood'] ?? '').toString().trim().toLowerCase();
-      if (counts.containsKey(mood)) counts[mood] = counts[mood]! + 1;
+      final mood = (m['main_mood'] ?? '').toString().toLowerCase().trim();
+      if (counts.containsKey(mood)) {
+        counts[mood] = counts[mood]! + 1;
+      }
     }
     return counts;
   }
@@ -83,7 +94,7 @@ class _MoodTrendCardState extends State<MoodTrendCard> {
       final main = (m['main_mood'] ?? '').toString().toLowerCase();
       final sub = (m['sub_mood'] ?? '').toString().toLowerCase();
       if (main.isEmpty) continue;
-      if (!map.containsKey(main)) map[main] = {};
+      map.putIfAbsent(main, () => {});
       if (sub.isNotEmpty) {
         map[main]![sub] = (map[main]![sub] ?? 0) + 1;
       }
@@ -91,85 +102,85 @@ class _MoodTrendCardState extends State<MoodTrendCard> {
     return map;
   }
 
+  // ---------------- UI HELPERS ----------------
+
   String moodEmoji(String mood) {
-    switch (mood.toLowerCase()) {
-      case 'happy':
-        return '😊';
-      case 'tired':
-        return '😴';
-      case 'anxious':
-        return '😰';
+    switch (mood) {
       case 'angry':
-        return '😡';
+        return '🤬';
+      case 'disgust':
+        return '🤢';
+      case 'fear':
+        return '😨';
+      case 'happy':
+        return '😀';
+      case 'neutral':
+        return '😐';
       case 'sad':
-        return '😢';
+        return '😭';
+      case 'surprise':
+        return '😲';
       default:
         return '😐';
     }
   }
 
-  String moodLabel(String mood) {
-    switch (mood.toLowerCase()) {
-      case 'happy':
-        return 'Happy';
-      case 'tired':
-        return 'Tired';
-      case 'anxious':
-        return 'Anxious';
-      case 'angry':
-        return 'Angry';
-      case 'sad':
-        return 'Sad';
-      default:
-        return mood.capitalize();
-    }
-  }
+  String moodLabel(String mood) => mood.capitalize();
 
   LinearGradient moodGradient(String mood) {
-    switch (mood.toLowerCase()) {
-      case 'happy':
-        return const LinearGradient(colors: [Colors.green, Colors.greenAccent]);
-      case 'tired':
-        return const LinearGradient(colors: [Colors.blueGrey, Colors.grey]);
-      case 'anxious':
-        return const LinearGradient(colors: [Colors.orange, Colors.deepOrangeAccent]);
+    switch (mood) {
       case 'angry':
         return const LinearGradient(colors: [Colors.red, Colors.redAccent]);
+      case 'disgust':
+        return const LinearGradient(colors: [Colors.green, Colors.lightGreen]);
+      case 'fear':
+        return const LinearGradient(colors: [Colors.deepPurple, Colors.purpleAccent]);
+      case 'happy':
+        return const LinearGradient(colors: [Colors.yellow, Colors.orangeAccent]);
+      case 'neutral':
+        return const LinearGradient(colors: [Colors.grey, Colors.blueGrey]);
       case 'sad':
         return const LinearGradient(colors: [Colors.blue, Colors.lightBlueAccent]);
+      case 'surprise':
+        return const LinearGradient(colors: [Colors.pink, Colors.pinkAccent]);
       default:
         return const LinearGradient(colors: [Colors.grey, Colors.white24]);
     }
   }
 
-  String _generateInsight(Map<String, int> moodCounts, int totalMoods) {
-    if (moodCounts.isEmpty) return "No moods logged yet. Start tracking to see insights!";
-    final sorted = moodCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    final topMood = sorted.first;
-    final percent = ((topMood.value / totalMoods) * 100).round();
-    if (percent >= 50) {
-      return "You mostly felt ${moodLabel(topMood.key)} ${moodEmoji(topMood.key)} this period ($percent%).";
-    } else if (sorted.length > 1) {
-      final secondMood = sorted[1];
-      return "Your moods were mixed. ${moodLabel(topMood.key)} ${moodEmoji(topMood.key)} was most common, followed by ${moodLabel(secondMood.key)} ${moodEmoji(secondMood.key)}.";
-    } else {
-      return "Your mood entries are balanced. Keep logging to discover patterns!";
+  String _generateInsight(Map<String, int> moodCounts, int total) {
+    if (total == 0) {
+      return "No moods logged yet. Start tracking to see insights!";
     }
+    final sorted = moodCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final top = sorted.first;
+    final percent = ((top.value / total) * 100).round();
+
+    return "You mostly felt ${moodLabel(top.key)} ${moodEmoji(top.key)} this period ($percent%).";
   }
+
+  // ---------------- BUILD ----------------
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final filteredMoods = _applyCardFilter();
-    final mainCounts = _getMoodCounts(filteredMoods);
-    final subCounts = _getSubMoodCounts(filteredMoods);
-    final sortedMain = mainCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    final int maxCount = sortedMain.isNotEmpty ? sortedMain.first.value : 1;
-    final int totalMoods = filteredMoods.length;
+    final filtered = _applyCardFilter();
+    final mainCounts = _getMoodCounts(filtered);
+    final subCounts = _getSubMoodCounts(filtered);
+
+    final sortedMain = mainCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final int maxCount =
+        sortedMain.isNotEmpty && sortedMain.first.value > 0
+            ? sortedMain.first.value
+            : 1;
+
+    final int totalMoods = filtered.length;
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
       color: Colors.white.withOpacity(0.06),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -178,17 +189,21 @@ class _MoodTrendCardState extends State<MoodTrendCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Mood Trend",
-                    style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold, color: Colors.white)),
+                const Text("Mood Trend",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold)),
                 InkWell(
                   onTap: () => Navigator.push(
-                      context, MaterialPageRoute(builder: (_) => const MoodTrendScreen())),
-                  child: Row(
-                    children: const [
-                      Text("View full", style: TextStyle(color: Colors.white70)),
-                      SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios, size: 18, color: Colors.white70),
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const MoodTrendScreen())),
+                  child: const Row(
+                    children: [
+                      Text("View full",
+                          style: TextStyle(color: Colors.white70)),
+                      Icon(Icons.arrow_forward_ios,
+                          size: 16, color: Colors.white70),
                     ],
                   ),
                 ),
@@ -197,118 +212,100 @@ class _MoodTrendCardState extends State<MoodTrendCard> {
             const SizedBox(height: 12),
             _buildTrendToggle(context),
             const SizedBox(height: 12),
-            if (!widget.isLoading && filteredMoods.isNotEmpty)
-              Column(
-                children: [
-                  ...sortedMain.map((entry) {
-                    final mainMood = entry.key;
-                    final count = entry.value;
-                    final widthFactor = count / maxCount;
-                    final animatedPercent = ((count / totalMoods) * 100).round();
-                    final isExpanded = expandedMoods.contains(mainMood);
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              if (isExpanded) {
-                                expandedMoods.remove(mainMood);
-                              } else {
-                                expandedMoods.add(mainMood);
-                              }
-                            });
-                          },
-                          child: Row(
-                            children: [
-                              Text(moodEmoji(mainMood), style: const TextStyle(fontSize: 20)),
-                              const SizedBox(width: 4),
-                              SizedBox(
-                                width: 60,
-                                child: Text(moodLabel(mainMood),
-                                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                                    overflow: TextOverflow.ellipsis),
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Container(
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: Colors.white12,
-                                  ),
-                                  child: FractionallySizedBox(
-                                    alignment: Alignment.centerLeft,
-                                    widthFactor: widthFactor,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(8),
-                                          gradient: moodGradient(mainMood)),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              SizedBox(
-                                width: 50,
-                                child: Text(
-                                  "$count ($animatedPercent%)",
-                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                  textAlign: TextAlign.right,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(
-                                isExpanded ? Icons.expand_less : Icons.expand_more,
-                                color: Colors.white70,
-                                size: 18,
-                              ),
-                            ],
+            if (!widget.isLoading && filtered.isNotEmpty)
+              ...sortedMain.map((entry) {
+                final mainMood = entry.key;
+                final count = entry.value;
+
+                final widthFactor =
+                    (count / maxCount).clamp(0.0, 1.0);
+                final percent =
+                    totalMoods > 0 ? ((count / totalMoods) * 100).round() : 0;
+
+                final isExpanded = expandedMoods.contains(mainMood);
+
+                return Column(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          isExpanded
+                              ? expandedMoods.remove(mainMood)
+                              : expandedMoods.add(mainMood);
+                        });
+                      },
+                      child: Row(
+                        children: [
+                          Text(moodEmoji(mainMood)),
+                          const SizedBox(width: 6),
+                          SizedBox(
+                            width: 70,
+                            child: Text(moodLabel(mainMood),
+                                style: const TextStyle(color: Colors.white70)),
                           ),
-                        ),
-                        AnimatedCrossFade(
-                          firstChild: Container(),
-                          secondChild: Padding(
-                            padding: const EdgeInsets.only(left: 36, top: 4, bottom: 8),
-                            child: Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: (subCounts[mainMood] ?? {}).entries.map((sub) {
-                                return Chip(
-                                  label: Text(
-                                    "${moodLabel(sub.key)} (${sub.value})",
-                                    style: const TextStyle(fontSize: 12),
+                          Expanded(
+                            child: Container(
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: Colors.white12,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: widthFactor,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: moodGradient(mainMood),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  backgroundColor: Colors.white10,
-                                  visualDensity: VisualDensity.compact,
-                                );
-                              }).toList(),
+                                ),
+                              ),
                             ),
                           ),
-                          crossFadeState: isExpanded
-                              ? CrossFadeState.showSecond
-                              : CrossFadeState.showFirst,
-                          duration: const Duration(milliseconds: 200),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Text(
-                      _generateInsight(mainCounts, totalMoods),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontStyle: FontStyle.italic,
-                        fontSize: 14,
+                          const SizedBox(width: 8),
+                          Text("$count ($percent%)",
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 12)),
+                          Icon(isExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                              color: Colors.white70),
+                        ],
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                  ),
-                ],
-              )
-            else if (!widget.isLoading)
+
+                    if (isExpanded)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32, top: 6),
+                        child: Wrap(
+                          spacing: 6,
+                          children: (subCounts[mainMood] ?? {}).entries.map((s) {
+                            return Chip(
+                              label: Text("${s.key.capitalize()} (${s.value})",
+                                  style: const TextStyle(fontSize: 12)),
+                              backgroundColor: Colors.white10,
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                  ],
+                );
+              }),
+
+            if (!widget.isLoading && filtered.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  _generateInsight(mainCounts, totalMoods),
+                  style: const TextStyle(
+                      color: Colors.white, fontStyle: FontStyle.italic),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+            if (!widget.isLoading && filtered.isEmpty)
               const Text("Log your first mood 😊",
                   style: TextStyle(color: Colors.white70)),
           ],
@@ -317,65 +314,49 @@ class _MoodTrendCardState extends State<MoodTrendCard> {
     );
   }
 
+  // ---------------- TOGGLE ----------------
+
   Widget _buildTrendToggle(BuildContext context) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Stack(
-        children: [
-          AnimatedAlign(
-            alignment: trendIndex == 0 ? Alignment.centerLeft : Alignment.centerRight,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            child: Container(
-              width: (MediaQuery.of(context).size.width - 64) / 2,
-              decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(16)),
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() => trendIndex = 0);
+              widget.onTrendChanged(0);
+            },
+            child: Center(
+              child: Text("Today",
+                  style: TextStyle(
+                      color: trendIndex == 0
+                          ? Colors.white
+                          : Colors.white70)),
             ),
           ),
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() => trendIndex = 0);
-                    widget.onTrendChanged(0);
-                  },
-                  child: Center(
-                    child: Text("Today",
-                        style: TextStyle(
-                            color: trendIndex == 0 ? Colors.white : Colors.white70,
-                            fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() => trendIndex = 1);
-                    widget.onTrendChanged(1);
-                  },
-                  child: Center(
-                    child: Text("This Week",
-                        style: TextStyle(
-                            color: trendIndex == 1 ? Colors.white : Colors.white70,
-                            fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ),
-            ],
+        ),
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() => trendIndex = 1);
+              widget.onTrendChanged(1);
+            },
+            child: Center(
+              child: Text("This Week",
+                  style: TextStyle(
+                      color: trendIndex == 1
+                          ? Colors.white
+                          : Colors.white70)),
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
+// ---------------- EXTENSION ----------------
+
 extension StringCasing on String {
-  String capitalize() => isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
+  String capitalize() =>
+      isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
 }

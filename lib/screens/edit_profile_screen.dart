@@ -82,8 +82,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     final nameController = TextEditingController(text: contact?['name'] ?? '');
-    final phoneController =
-        TextEditingController(text: contact?['phone_number'] ?? '');
+    final emailController =
+        TextEditingController(text: contact?['contact_email'] ?? '');
     final relationController =
         TextEditingController(text: contact?['relationship'] ?? '');
     bool showError = false;
@@ -109,14 +109,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
                 TextField(
-                  controller: phoneController,
+                  controller: emailController,
                   decoration: InputDecoration(
-                    labelText: "Phone Number",
-                    errorText: showError && phoneController.text.isEmpty
+                    labelText: "Email Address",
+                    errorText: showError && emailController.text.isEmpty
                         ? "Required"
                         : null,
                   ),
-                  keyboardType: TextInputType.phone,
+                  keyboardType: TextInputType.emailAddress,
                 ),
                 TextField(
                   controller: relationController,
@@ -137,7 +137,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (nameController.text.isEmpty ||
-                    phoneController.text.isEmpty ||
+                    emailController.text.isEmpty ||
                     relationController.text.isEmpty) {
                   setState(() => showError = true);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -150,7 +150,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 if (contact == null) {
                   await _service.addEmergencyContact(
                     name: nameController.text,
-                    phoneNumber: phoneController.text,
+                    email: emailController.text,
                     relationship: relationController.text,
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -160,7 +160,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   await _service.updateEmergencyContact(
                     id: contact['id'],
                     name: nameController.text,
-                    phoneNumber: phoneController.text,
+                    email: emailController.text,
                     relationship: relationController.text,
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -324,7 +324,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             elevation: 3,
                             margin: const EdgeInsets.symmetric(vertical: 6),
                             child: ListTile(
-                              leading: const Icon(Icons.contact_phone,
+                              leading: const Icon(Icons.contact_emergency,
                                   color: Colors.teal),
                               title: Text(
                                 c['name'],
@@ -332,7 +332,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
-                                  "${c['relationship']} • ${c['phone_number']}"),
+                                  "${c['relationship']} • ${c['contact_email']}"),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [

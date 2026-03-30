@@ -152,7 +152,7 @@ class ProfileService {
 
     final response = await _supabase
         .from('emergency_contacts')
-        .select('id, name, phone_number, relationship, created_at')
+        .select('id, name, contact_email, relationship, created_at')
         .eq('user_id', user.id)
         .order('created_at', ascending: true);
 
@@ -161,7 +161,7 @@ class ProfileService {
 
   Future<void> addEmergencyContact({
     required String name,
-    required String phoneNumber,
+    required String email,
     required String relationship,
   }) async {
     final user = _supabase.auth.currentUser;
@@ -172,14 +172,14 @@ class ProfileService {
       throw Exception('You can only have up to 3 emergency contacts.');
     }
 
-    if (name.isEmpty || phoneNumber.isEmpty || relationship.isEmpty) {
+    if (name.isEmpty || email.isEmpty || relationship.isEmpty) {
       throw Exception('Please fill in all contact fields.');
     }
 
     await _supabase.from('emergency_contacts').insert({
       'user_id': user.id,
       'name': name,
-      'phone_number': phoneNumber,
+      'contact_email': email,
       'relationship': relationship,
     });
   }
@@ -187,16 +187,16 @@ class ProfileService {
   Future<void> updateEmergencyContact({
     required String id,
     required String name,
-    required String phoneNumber,
     required String relationship,
+    required String email,
   }) async {
-    if (name.isEmpty || phoneNumber.isEmpty || relationship.isEmpty) {
+    if (name.isEmpty || email.isEmpty || relationship.isEmpty) {
       throw Exception('Please fill in all contact fields before saving.');
     }
 
     await _supabase.from('emergency_contacts').update({
       'name': name,
-      'phone_number': phoneNumber,
+      'contact_email': email,
       'relationship': relationship,
     }).eq('id', id);
   }

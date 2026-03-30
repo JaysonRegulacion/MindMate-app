@@ -6,6 +6,8 @@ import 'package:mindmate/widgets/moodtrendscreen/mood_summary.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/mood_repository.dart';
 
+enum MoodPolarity { positive, neutral, negative }
+
 class MoodTrendScreen extends StatefulWidget {
   const MoodTrendScreen({super.key});
 
@@ -22,29 +24,19 @@ class _MoodTrendScreenState extends State<MoodTrendScreen> {
   String _filter = "This Week";
 
   final int minY = 1;
-  final int maxY = 5;
-
-  final Map<String, String> moodTypes = {
-    "Happy": "😊",
-    "Tired": "😴",
-    "Angry": "😡",
-    "Anxious": "😰",
-    "Sad": "😢",
-  };
+  final int maxY = 3;
 
   final Map<String, dynamic> moodLegendData = {
-    "Happy": {"emoji": "😊", "color": Colors.green},
-    "Tired": {"emoji": "😴", "color": Colors.blue},
-    "Angry": {"emoji": "😡", "color": Colors.red},
-    "Anxious": {"emoji": "😰", "color": Colors.purple},
-    "Sad": {"emoji": "😢", "color": Colors.orange},
+    "Positive": {"emoji": "😀", "color": Colors.green},
+    "Neutral": {"emoji": "😐", "color": Colors.grey},
+    "Negative": {"emoji": "😞", "color": Colors.red},
   };
 
   @override
   void initState() {
     super.initState();
     _repo = MoodRepository(Supabase.instance.client);
-    _repo.initConnectivityListener(); // sync offline moods automatically
+    _repo.initConnectivityListener();
     _fetchMoods();
   }
 
@@ -64,305 +56,290 @@ class _MoodTrendScreenState extends State<MoodTrendScreen> {
     });
   }
 
-  int moodToValue(String mood) {
-    switch (mood.toLowerCase()) {
+  // ---------------- POLARITY LOGIC ----------------
+
+  MoodPolarity getMoodPolarity(String emotion) {
+    switch (emotion.toLowerCase()) {
       case 'happy':
-        return 5;
-      case 'tired':
-        return 4;
+      case 'surprise':
+        return MoodPolarity.positive;
+
+      case 'neutral':
+        return MoodPolarity.neutral;
+
       case 'angry':
+      case 'disgust':
+      case 'fear':
+      case 'sad':
+        return MoodPolarity.negative;
+
+      default:
+        return MoodPolarity.neutral;
+    }
+  }
+
+  int polarityToValue(MoodPolarity polarity) {
+    switch (polarity) {
+      case MoodPolarity.positive:
         return 3;
-      case 'anxious':
+      case MoodPolarity.neutral:
         return 2;
-      case 'sad':
+      case MoodPolarity.negative:
         return 1;
-      default:
-        return 4;
     }
   }
 
-  String moodEmoji(String mood) {
-    return moodTypes.entries
-        .firstWhere(
-          (e) => e.key.toLowerCase() == mood.toLowerCase(),
-          orElse: () => const MapEntry("Other", "🙂"),
-        )
-        .value;
+  String polarityEmoji(MoodPolarity polarity) {
+    switch (polarity) {
+      case MoodPolarity.positive:
+        return "😀";
+      case MoodPolarity.neutral:
+        return "😐";
+      case MoodPolarity.negative:
+        return "😞";
+    }
   }
 
-  Color moodColor(String mood) {
-    switch (mood.toLowerCase()) {
-      case 'happy':
+  Color polarityColor(MoodPolarity polarity) {
+    switch (polarity) {
+      case MoodPolarity.positive:
         return Colors.green;
-      case 'tired':
-        return Colors.blue;
-      case 'angry':
-        return Colors.red;
-      case 'anxious':
-        return Colors.purple;
-      case 'sad':
-        return Colors.orange;
-      default:
+      case MoodPolarity.neutral:
         return Colors.grey;
+      case MoodPolarity.negative:
+        return Colors.red;
     }
   }
+
+  String emotionEmoji(String emotion) {
+    switch (emotion.toLowerCase()) {
+      case 'angry':
+        return '🤬';
+      case 'disgust':
+        return '🤢';
+      case 'fear':
+        return '😨';
+      case 'happy':
+        return '😀';
+      case 'neutral':
+        return '😐';
+      case 'sad':
+        return '😭';
+      case 'surprise':
+        return '😲';
+      default:
+        return '😐';
+    }
+  }
+
+  // ---------------- FILTER ----------------
 
   List<Map<String, dynamic>> _applyFilter() {
     final now = DateTime.now();
-    if (_filter == "Today") {
-      return _moods.where((m) {
-        final d = DateTime.parse(m['created_at']);
-        return d.year == now.year && d.month == now.month && d.day == now.day;
-      }).toList();
-    } else if (_filter == "This Week") {
-      final weekStart = now.subtract(Duration(days: now.weekday - 1));
-      final weekEnd = weekStart.add(const Duration(days: 6));
-      return _moods.where((m) {
-        final d = DateTime.parse(m['created_at']);
-        return !d.isBefore(weekStart) && !d.isAfter(weekEnd);
-      }).toList();
-    } else if (_filter == "This Month") {
-      return _moods.where((m) {
-        final d = DateTime.parse(m['created_at']);
-        return d.year == now.year && d.month == now.month;
-      }).toList();
-    } else if (_filter == "This Year") {
-      return _moods.where((m) {
-        final d = DateTime.parse(m['created_at']);
-        return d.year == now.year;
-      }).toList();
-    }
-    return _moods; // All
+
+    return _moods.where((m) {
+      final d = DateTime.parse(m['created_at']);
+
+      switch (_filter) {
+        case "Today":
+          return d.year == now.year && d.month == now.month && d.day == now.day;
+        case "This Week":
+          final start = now.subtract(Duration(days: now.weekday - 1));
+          final end = start.add(const Duration(days: 6));
+          return !d.isBefore(start) && !d.isAfter(end);
+        case "This Month":
+          return d.year == now.year && d.month == now.month;
+        case "This Year":
+          return d.year == now.year;
+        default:
+          return true;
+      }
+    }).toList();
   }
+
+  // ---------------- UI ----------------
 
   @override
   Widget build(BuildContext context) {
     final filteredMoods = _applyFilter().reversed.toList();
-
-    final double chartWidth =
-      filteredMoods.length <= 3 ? 320 : filteredMoods.length * 80;
+    final chartWidth =
+        filteredMoods.length <= 3 ? 320.0 : filteredMoods.length * 80.0;
 
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
         title: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Text("Mood Trends"),
-                SizedBox(width: 8),
-                Text("📈", style: TextStyle(fontSize: 20)),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              _filter,
-              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9)),
-            ),
+            const Text("Mood Trends"),
+            Text(_filter,
+                style:
+                    TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9))),
           ],
         ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0xFF6DD5FA), Color(0xFF2980B9)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
             ),
           ),
         ),
-        elevation: 0,
       ),
       body: RefreshIndicator(
         onRefresh: _fetchMoods,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          _buildFilterChip("Today", Icons.today),
-                          _buildFilterChip("This Week", Icons.calendar_view_week),
-                          _buildFilterChip("This Month", Icons.calendar_month),
-                          _buildFilterChip("This Year", Icons.calendar_today),
-                          _buildFilterChip("All", Icons.all_inclusive),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
+          padding: const EdgeInsets.all(16),
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        _buildFilterChip("Today", Icons.today),
+                        _buildFilterChip(
+                            "This Week", Icons.calendar_view_week),
+                        _buildFilterChip(
+                            "This Month", Icons.calendar_month),
+                        _buildFilterChip("This Year", Icons.calendar_today),
+                        _buildFilterChip("All", Icons.all_inclusive),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
-                      // Chart
-                      SizedBox(
-                        height: 280,
-                        child: filteredMoods.isEmpty
-                            ? Center(
-                                child: Text(
-                                  "No moods found for $_filter",
-                                  style: const TextStyle(fontSize: 16),
+                    SizedBox(
+                      height: 260,
+                      child: filteredMoods.isEmpty
+                          ? const Center(child: Text("No mood data"))
+                          : Row(
+                              children: [
+                                Column(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: const [
+                                    Text("😀"),
+                                    Text("😐"),
+                                    Text("😞"),
+                                  ],
                                 ),
-                              )
-                            : Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: const [
-                                      Text("😊", style: TextStyle(fontSize: 18)),
-                                      Text("😴", style: TextStyle(fontSize: 18)),
-                                      Text("😡", style: TextStyle(fontSize: 18)),
-                                      Text("😰", style: TextStyle(fontSize: 18)),
-                                      Text("😢", style: TextStyle(fontSize: 18)),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Scrollbar(
-                                      controller: _chartScrollController,
-                                      thumbVisibility: true,
-                                      child: SingleChildScrollView(
-                                        controller: _chartScrollController,
-                                        scrollDirection: Axis.horizontal,
-                                        physics: const BouncingScrollPhysics(),
-                                        child: SizedBox(
-                                          width: chartWidth,
-                                          child: LineChart(
-                                            LineChartData(
-                                              minY: minY.toDouble(),
-                                              maxY: maxY.toDouble(),
-                                              minX: 0.5,
-                                              maxX: (filteredMoods.length + 0.5).toDouble(),
-                                              gridData: FlGridData(
-                                                show: true,
-                                                drawVerticalLine: true,
-                                                drawHorizontalLine: true,
-                                                horizontalInterval: 1,   // ← 5 horizontal lines (1,2,3,4,5)
-                                                verticalInterval: 1,
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    controller: _chartScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: chartWidth,
+                                      child: LineChart(
+                                        LineChartData(
+                                          minY: minY.toDouble(),
+                                          maxY: maxY.toDouble(),
+                                          minX: 0.5,
+                                          maxX:
+                                              filteredMoods.length + 0.5,
+                                          gridData: FlGridData(
+                                            show: true,
+                                            horizontalInterval: 1,
+                                            verticalInterval: 1,
+                                          ),
+                                          titlesData: FlTitlesData(
+                                            leftTitles: AxisTitles(
+                                                sideTitles: SideTitles(
+                                                    showTitles: false)),
+                                            topTitles: AxisTitles(
+                                                sideTitles: SideTitles(
+                                                    showTitles: false)),
+                                            rightTitles: AxisTitles(
+                                                sideTitles: SideTitles(
+                                                    showTitles: false)),
+                                            bottomTitles: AxisTitles(
+                                              sideTitles: SideTitles(
+                                                showTitles: true,
+                                                getTitlesWidget: (v, _) {
+                                                  final i = v.toInt() - 1;
+                                                  if (i < 0 ||
+                                                      i >=
+                                                          filteredMoods
+                                                              .length) {
+                                                    return const SizedBox();
+                                                  }
+                                                  final d = DateTime.parse(
+                                                      filteredMoods[i]
+                                                          ['created_at']);
+                                                  return Text(
+                                                      DateFormat('MM/dd')
+                                                          .format(d),
+                                                      style: const TextStyle(
+                                                          fontSize: 10));
+                                                },
                                               ),
-                                              borderData: FlBorderData(show: true),
-                                              titlesData: FlTitlesData(
-                                                leftTitles: AxisTitles(
-                                                  sideTitles: SideTitles(showTitles: false),
-                                                ),
-                                                rightTitles: AxisTitles(
-                                                  sideTitles: SideTitles(showTitles: false),
-                                                ),
-                                                topTitles: AxisTitles(
-                                                  sideTitles: SideTitles(showTitles: false),
-                                                ),
-                                                bottomTitles: AxisTitles(
-                                                  sideTitles: SideTitles(
-                                                    showTitles: true,
-                                                    interval: 1,
-                                                    getTitlesWidget: (value, _) {
-                                                      final index = value.toInt() - 1;
-                                                      if (index < 0 || index >= filteredMoods.length) return const SizedBox();
-                                                      final date = DateTime.parse(filteredMoods[index]['created_at']);
-                                                      return Text(
-                                                        DateFormat('MM/dd').format(date),
-                                                        style: const TextStyle(fontSize: 10),
-                                                      );
-                                                    },
-                                                  ),
-                                                ),
-                                              ),
-                                              lineBarsData: [
-                                                LineChartBarData(
-                                                  spots: List.generate(
-                                                    filteredMoods.length,
-                                                    (i) => FlSpot(
-                                                      (i + 1).toDouble(),
-                                                      moodToValue(filteredMoods[i]['main_mood']).toDouble(),
-                                                    ),
-                                                  ),
-                                                  isCurved: true,
-                                                  curveSmoothness: 0.4,
-                                                  color: Colors.blueAccent,
-                                                  barWidth: 3,
-                                                  isStrokeCapRound: true,
-                                                  preventCurveOverShooting: true,
-                                                  dotData: FlDotData(
-                                                    show: true,
-                                                    getDotPainter: (spot, _, __, ___) {
-                                                      final mood = filteredMoods[spot.x.toInt() - 1];
-                                                      return FlDotCirclePainter(
-                                                        radius: 6,
-                                                        color: moodColor(mood['main_mood']),
-                                                        strokeWidth: 2,
-                                                        strokeColor: (mood['synced'] ?? true) ? Colors.white : Colors.orange,
-                                                      );
-                                                    },
-                                                  ),
-                                                ),
-                                              ],
-                                              lineTouchData: LineTouchData(
-                                                enabled: true,
-                                                touchTooltipData: LineTouchTooltipData(
-                                                  fitInsideHorizontally: true,  // tooltip adjusts if hitting left/right edge
-                                                  fitInsideVertically: true,    // tooltip adjusts if hitting top/bottom
-                                                  tooltipBorderRadius: BorderRadius.circular(8),
-                                                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                  getTooltipColor: (touchedSpot) => Colors.black87,
-                                                  getTooltipItems: (spots) {
-                                                    return spots.map((spot) {
-                                                      final mood = filteredMoods[spot.x.toInt() - 1];
-                                                      final date = DateTime.parse(mood['created_at']);
-                                                      final synced = mood['synced'] == true ? "" : " (offline)";
-                                                      final subMood = mood['sub_mood'] != null ? " (${mood['sub_mood']})" : "";
-                                                      return LineTooltipItem(
-                                                        "${moodEmoji(mood['main_mood'])} ${mood['main_mood']}$subMood$synced\n${DateFormat('MM/dd HH:mm').format(date)}",
-                                                        const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                                      );
-                                                    }).toList();
-                                                  },
-                                                ),
-                                              ),
+                                            ),
+                                          ),
+                                          lineBarsData: [
+                                            LineChartBarData(
+                                              isCurved: true,
+                                              barWidth: 3,
+                                              spots: List.generate(
+                                                  filteredMoods.length, (i) {
+                                                final polarity =
+                                                    getMoodPolarity(
+                                                        filteredMoods[i]
+                                                            ['main_mood']);
+                                                return FlSpot(
+                                                    (i + 1).toDouble(),
+                                                    polarityToValue(polarity)
+                                                        .toDouble());
+                                              }),
+                                              dotData: FlDotData(show: true),
+                                            )
+                                          ],
+                                          lineTouchData: LineTouchData(
+                                            enabled: true,
+                                            touchTooltipData:
+                                                LineTouchTooltipData(
+                                              getTooltipItems: (spots) {
+                                                return spots.map((spot) {
+                                                  final mood =
+                                                      filteredMoods[
+                                                          spot.x.toInt() - 1];
+                                                  final polarity =
+                                                      getMoodPolarity(
+                                                          mood['main_mood']);
+                                                  final date =
+                                                      DateTime.parse(
+                                                          mood['created_at']);
+                                                  return LineTooltipItem(
+                                                    "${polarity.name.toUpperCase()}\n"
+                                                    "${emotionEmoji(mood['main_mood'])} ${mood['main_mood']}\n"
+                                                    "${DateFormat('MM/dd HH:mm').format(date)}",
+                                                    const TextStyle(
+                                                        color: Colors.white),
+                                                  );
+                                                }).toList();
+                                              },
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: List.generate(
-                                      (maxY - minY + 1),
-                                      (i) => Text(
-                                        (maxY - i).toString(),
-                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
+                            ),
+                    ),
+
+                    const SizedBox(height: 16),
+                    MoodLegend(moodLegend: moodLegendData),
+
+                    const SizedBox(height: 16),
+                    if (filteredMoods.isNotEmpty)
+                      MoodSummaryCard(
+                        summary: MoodSummary(filteredMoods),
+                        filter: _filter,
+                        moodEmoji: emotionEmoji,
                       ),
-
-                      const SizedBox(height: 16),
-                      MoodLegend(moodLegend: moodLegendData),
-                      const SizedBox(height: 16),
-
-                      if (filteredMoods.isNotEmpty)
-                        MoodSummaryCard(
-                          summary: MoodSummary(
-                            filteredMoods.map((m) {
-                              return {
-                                ...m,
-                                'value': moodToValue(m['main_mood']), // precompute value for MoodSummary
-                              };
-                            }).toList(),
-                          ),
-                          filter: _filter,
-                          moodEmoji: moodEmoji,
-                        ),
-                    ],
-                  ),
-          ),
+                  ],
+                ),
         ),
       ),
     );
@@ -380,7 +357,6 @@ class _MoodTrendScreenState extends State<MoodTrendScreen> {
       ),
       selected: _filter == label,
       onSelected: (_) => setState(() => _filter = label),
-      selectedColor: Colors.blue.shade100,
     );
   }
 }

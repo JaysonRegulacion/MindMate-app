@@ -23,7 +23,7 @@ class WellnessTipCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              "Daily Tip 🌱",
+              "Daily Reminder 🌱",
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
