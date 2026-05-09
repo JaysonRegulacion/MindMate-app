@@ -22,7 +22,7 @@ Future<void> showUpdateDialog(
     context: context,
     barrierDismissible: !forceUpdate,
     builder: (_) => WillPopScope(
-      onWillPop: () async => !forceUpdate, // prevents back button if forceUpdate is true
+      onWillPop: () async => !forceUpdate,
       child: AlertDialog(
         title: const Text('Update Available'),
         content: Text(

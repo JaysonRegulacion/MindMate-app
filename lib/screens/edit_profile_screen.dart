@@ -332,7 +332,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
-                                  "${c['relationship']} • ${c['contact_email']}"),
+                                  "${c['relationship']} • ${c['contact_number']}"),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
