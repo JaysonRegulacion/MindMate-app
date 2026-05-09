@@ -144,21 +144,21 @@ class _MoodLogScreenState extends State<MoodLogScreen>
 
       final contacts = await supabase
           .from('emergency_contacts')
-          .select('contact_email')
+          .select('contactPhone')
           .eq('user_id', currentUser.id);
 
-      final emergencyEmails = (contacts as List)
-          .map((c) => c['contact_email']?.toString())
+      final emergencyPhones = (contacts as List)
+          .map((c) => c['contactPhone']?.toString())
           .where((e) => e != null && e.isNotEmpty)
           .cast<String>()
           .toList();
 
-      if (emergencyEmails.isNotEmpty) {
+      if (emergencyPhones.isNotEmpty) {
         try {
           await _riskService.detectAndNotifyMultiple(
             userId: currentUser.id,
             userName: currentUser.email ?? "Anonymous",
-            emergencyEmails: emergencyEmails,
+            emergencyPhones: emergencyPhones,
           );
         } catch (e) {
           print("⚠️ Risk detection failed: $e");

@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:mindmate/chats/widgets.dart';
 import 'package:mindmate/services/ai_service.dart';
@@ -142,7 +141,7 @@ class _ChatScreenState extends State<ChatScreen> {
             await riskService.detectAndNotifyMultiple(
               userId: user.id,
               userName: user.email ?? "Anonymous",
-              emergencyEmails: emails,
+              emergencyPhones: emails,
             );
           }
         } catch (e) {

@@ -207,7 +207,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         _statCard("Avg Mood", avgMood.toStringAsFixed(1), Icons.mood),
         _statCard("Total Logs", "$totalLogs", Icons.book),
-        _statCard("Streak", "$longestStreak", Icons.local_fire_department),
       ],
     );
   }
@@ -260,7 +259,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   leading: const Icon(Icons.contact_phone, color: Colors.teal),
                   title: Text(c['name']),
                   subtitle:
-                      Text("${c['relationship']} • ${c['contact_email']}"),
+                      Text("${c['relationship']} • ${c['contact_number']}"),
                 ),
               );
             }).toList(),

@@ -25,7 +25,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   // Emergency Contact
   final emergencyNameController = TextEditingController();
   final emergencyRelationshipController = TextEditingController();
-  final emergencyEmailController = TextEditingController();
+  final emergencyPhoneController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -58,7 +58,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final username = usernameController.text.trim();
     final emergencyName = capitalizeWords(emergencyNameController.text.trim());
     final emergencyRelationship = capitalize(emergencyRelationshipController.text.trim());
-    final emergencyEmail = emergencyEmailController.text.trim();
+    final emergencyPhone = emergencyPhoneController.text.trim();
 
     try {
 
@@ -93,7 +93,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           'username': username,
           'emergency_name': emergencyName,
           'emergency_relationship': emergencyRelationship,
-          'emergency_email': emergencyEmail,
+          'emergency_phone': emergencyPhone,
         },
       );
 
@@ -210,7 +210,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     usernameController.dispose();
     emergencyNameController.dispose();
     emergencyRelationshipController.dispose();
-    emergencyEmailController.dispose();
+    emergencyPhoneController.dispose();
     super.dispose();
   }
 
@@ -374,14 +374,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                                     
                                     CustomTextField(
-                                      controller: emergencyEmailController, // you can rename this to emergencyEmailController
-                                      label: "Contact Email",
-                                      icon: Icons.email_outlined,
-                                      keyboardType: TextInputType.emailAddress,
+                                      controller: emergencyPhoneController,
+                                      label: "Phone Number",
+                                      icon: Icons.phone_outlined,
+                                      keyboardType: TextInputType.phone,
                                       validator: (v) {
-                                        if (v == null || v.isEmpty) return 'Enter contact email';
-                                        if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w]{2,4}$').hasMatch(v)) {
-                                          return 'Invalid email';
+                                        if (v == null || v.isEmpty) return 'Enter contact phone';
+                                        if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(v)) {
+                                          return 'Invalid phone number';
                                         }
                                         return null;
                                       },

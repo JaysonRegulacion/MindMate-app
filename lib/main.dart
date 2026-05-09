@@ -8,13 +8,13 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mindmate/services/notification_service.dart';
 import 'package:mindmate/services/app_version_service.dart';
 import 'package:mindmate/widgets/update_dialog.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Show the first frame immediately
   runApp(const MyApp());
 }
 
@@ -28,6 +28,16 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _sub;
+
+  Future<void> requestSmsPermission() async {
+  final status = await Permission.sms.request();
+
+  if (status.isGranted) {
+    debugPrint("✅ SMS permission granted");
+  } else {
+    debugPrint("❌ SMS permission denied");
+  }
+}
 
   @override
   void initState() {
@@ -47,13 +57,14 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initializeServices() async {
-    // Run notifications and Supabase initialization asynchronously
     unawaited(NotificationService.initialize());
     unawaited(Supabase.initialize(
       url: 'https://jvvesomjnzzjzakxcdmj.supabase.co',
       anonKey:
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dmVzb21qbnp6anpha3hjZG1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5MTg2ODAsImV4cCI6MjA3MDQ5NDY4MH0.jXb1RM7NlsrLiGuqJCZxkVp6eMD0w0XxX5FM85l5KqY',
     ));
+
+    await requestSmsPermission();
 
     // Initialize Hive and open boxes in parallel
     await Hive.initFlutter();

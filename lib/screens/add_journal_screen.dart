@@ -231,21 +231,34 @@ class _AddJournalScreenState extends State<AddJournalScreen> {
 
       // 🔹 Risk detection
       print('🚨 Risk detection started...');
-      final contacts = await supabase
+      final List contacts = await supabase
           .from('emergency_contacts')
-          .select('contact_email')
+          .select('contact_number')
           .eq('user_id', userId);
 
-      final emergencyEmails = (contacts as List)
-          .map((c) => c['contact_email']?.toString())
-          .whereType<String>()
-          .toList();
+      final emergencyPhones = contacts
+        .map((c) => c['contact_number'])
+        .where((phone) => phone != null && phone.toString().trim().isNotEmpty)
+        .map((phone) => phone.toString())
+        .toList();
 
-      if (emergencyEmails.isNotEmpty) {
+      final profile = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', userId)
+        .maybeSingle();
+
+      final firstName = profile?['first_name']?.toString().trim() ?? '';
+      final lastName = profile?['last_name']?.toString().trim() ?? '';
+
+      final userName = (firstName + ' ' + lastName).trim();
+      final safeUserName = userName.isNotEmpty ? userName : 'User';
+
+      if (emergencyPhones.isNotEmpty) {
         await _riskService.detectAndNotifyMultiple(
           userId: userId,
-          userName: supabase.auth.currentUser?.email ?? 'Anonymous',
-          emergencyEmails: emergencyEmails,
+          userName: safeUserName,
+          emergencyPhones: emergencyPhones,
         );
       }
     } catch (e) {

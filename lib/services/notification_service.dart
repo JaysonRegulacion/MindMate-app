@@ -20,7 +20,7 @@ class NotificationService {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
 
-    await _notifications.initialize(initSettings);
+    await _notifications.initialize(settings: initSettings);
     print("📦 FlutterLocalNotifications initialized");
 
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -174,11 +174,11 @@ class NotificationService {
       );
 
       await _notifications.zonedSchedule(
-        i, // ID: 0,1,2
-        titles[i % titles.length],
-        finalMessage,
-        scheduledTime,
-        NotificationDetails(
+        id: i,
+        title: titles[i % titles.length],
+        body: finalMessage,
+        scheduledDate: scheduledTime,
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             'daily_reminder_channel',
             'Daily Reminder',

@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mindmate/services/safety_ai_service.dart';
-import 'package:mindmate/services/email_service.dart';
+import 'package:mindmate/services/sms_service.dart';
 
 class RiskDetectionService {
   final SupabaseClient supabase;
@@ -131,88 +131,126 @@ class RiskDetectionService {
     return true;
   }
 
-  /// Send emergency notification email if allowed by cooldown
+  String normalizePHNumber(String number) {
+    number = number.replaceAll(RegExp(r'\s+'), '');
+
+    if (number.startsWith('09')) {
+      return '+63${number.substring(1)}';
+    }
+    if (number.startsWith('9')) {
+      return '+63$number';
+    }
+    return number;
+  }
+
+  /// Send emergency notification sms if allowed by cooldown
   Future<bool> _sendEmergencyNotification({
     required String userId,
     required String userName,
-    required String contactEmail,
+    required String contact_number,
     required String riskReason,
   }) async {
     if (!await _canSendNotification(userId)) return false;
 
     try {
-      await sendEmergencyEmail(
-        contactEmail: contactEmail,
-        userId: userId,
-        riskReason: riskReason,
-      );
+      final message =
+          "MINDMATE EMERGENCY ALERT\n\n"
+          "$userName may be at risk.\n\n"
+          "REASON: $riskReason\n\n"
+          "Automated message from MindMate.";
 
-      return true;
+      // 🔁 Retry up to 2 attempts
+      for (int attempt = 1; attempt <= 2; attempt++) {
+        try {
+          await SMSService.sendEmergencySMS(
+            phoneNumber: contact_number,
+            message: message,
+          );
+
+          print("✅ SMS sent on attempt $attempt");
+          return true; // success
+        } catch (e) {
+          print("⚠️ Attempt $attempt failed: $e");
+
+          if (attempt == 2) {
+            // last attempt → fail
+            rethrow;
+          }
+
+          // optional: small delay before retry
+          await Future.delayed(Duration(seconds: 2));
+        }
+      }
+
+      return false; // fallback (should not reach here)
     } catch (e) {
+      print("❌ SMS error after retries: $e");
       return false;
     }
   }
 
   /// Public method: check risk + notify emergency contact if needed
   Future<void> detectAndNotifyMultiple({
-  required String userId,
-  required String userName,
-  required List<String> emergencyEmails,
-}) async {
-  if (emergencyEmails.isEmpty) {
-    print("⚠️ No emergency emails provided; skipping notification.");
-    return;
-  }
+    required String userId,
+    required String userName,
+    required List<String> emergencyPhones,
+  }) async {
+    if (emergencyPhones.isEmpty) {
+      print("⚠️ No emergency phone numbers provided; skipping notification.");
+      return;
+    }
 
-  print("⚠️ Running SafetyAI risk detection for $userName");
+    print("⚠️ Running SafetyAI risk detection for $userName");
 
-  final context = await _fetchUserContext(userId);
+    final context = await _fetchUserContext(userId);
 
-  final aiResult = await _analyzeRiskContext(
-    userId: userId,
-    userName: userName,
-    moods: context['moods'] as List<Map<String, dynamic>>,
-    journals: context['journals'] as List<Map<String, dynamic>>,
-    chats: context['chats'] as List<Map<String, dynamic>>,
-  );
+    final aiResult = await _analyzeRiskContext(
+      userId: userId,
+      userName: userName,
+      moods: context['moods'] as List<Map<String, dynamic>>,
+      journals: context['journals'] as List<Map<String, dynamic>>,
+      chats: context['chats'] as List<Map<String, dynamic>>,
+    );
 
-  final score = aiResult['riskScore'] as double;
-  final reason = aiResult['riskReason'] as String;
+    final score = aiResult['riskScore'] as double;
+    final reason = aiResult['riskReason'] as String;
 
-  print("ℹ️ SafetyAI: score=$score reason=$reason");
+    print("ℹ️ SafetyAI: score=$score reason=$reason");
 
-  if (score >= riskThreshold) {
-    print("⚠️ Risk score ($score) >= threshold ($riskThreshold)");
+    if (score >= riskThreshold) {
+      print("⚠️ Risk score ($score) >= threshold ($riskThreshold)");
 
-    // <-- Declare the variable here
-    bool atLeastOneSent = false;
+      bool atLeastOneSent = false;
 
-    for (final email in emergencyEmails) {
-      final sent = await _sendEmergencyNotification(
-        userId: userId,
-        userName: userName,
-        contactEmail: email,
-        riskReason: reason,
-      );
-      if (sent) {
-        print("✅ Emergency email sent to $email");
-        atLeastOneSent = true;
-      } else {
-        print("⚠️ Emergency email to $email skipped (cooldown or failed).");
+      for (final phone in emergencyPhones) {
+
+        final normalizedPhone = normalizePHNumber(phone);
+
+        final sent = await _sendEmergencyNotification(
+          userId: userId,
+          userName: userName,
+          contact_number: normalizedPhone,
+          riskReason: reason,
+        );
+
+        if (sent) {
+          print("✅ Emergency SMS sent to $phone");
+          atLeastOneSent = true;
+        } else {
+          print("⚠️ SMS to $phone skipped (cooldown or failed).");
+        }
       }
-    }
 
-    // Update last_sent only if at least one email was sent
-    if (atLeastOneSent) {
-      await supabase.from('user_notifications').upsert({
-        'user_id': userId,
-        'last_sent': DateTime.now().toUtc().toIso8601String(),
-      },onConflict: 'user_id',);
-      print("📝 Updated last_sent in user_notifications");
+      if (atLeastOneSent) {
+        await supabase.from('user_notifications').upsert({
+          'user_id': userId,
+          'last_sent': DateTime.now().toUtc().toIso8601String(),
+        }, onConflict: 'user_id');
+
+        print("📝 Updated last_sent in user_notifications");
+      }
+    } else {
+      print("✅ Risk score ($score) below threshold ($riskThreshold); no action taken.");
     }
-  } else {
-    print("✅ Risk score ($score) below threshold ($riskThreshold); no action taken.");
   }
-}
-
 }

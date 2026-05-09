@@ -16,7 +16,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final ProfileService _service = ProfileService();
   late TextEditingController firstNameController;
   late TextEditingController lastNameController;
-  late TextEditingController emailController;
+  late TextEditingController numberController;
   bool isSaving = false;
   String? avatarUrl;
 
@@ -30,8 +30,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         TextEditingController(text: widget.profile?['first_name'] ?? '');
     lastNameController =
         TextEditingController(text: widget.profile?['last_name'] ?? '');
-    emailController =
-        TextEditingController(text: widget.profile?['email'] ?? '');
+    numberController =
+        TextEditingController(text: widget.profile?['contact_number'] ?? '');
     avatarUrl = widget.profile?['avatar_url'];
     _loadEmergencyContacts();
   }
@@ -82,8 +82,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     final nameController = TextEditingController(text: contact?['name'] ?? '');
-    final emailController =
-        TextEditingController(text: contact?['contact_email'] ?? '');
+    final numberController =
+        TextEditingController(text: contact?['contact_number'] ?? '');
     final relationController =
         TextEditingController(text: contact?['relationship'] ?? '');
     bool showError = false;
@@ -109,14 +109,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
                 TextField(
-                  controller: emailController,
+                  controller: numberController,
                   decoration: InputDecoration(
-                    labelText: "Email Address",
-                    errorText: showError && emailController.text.isEmpty
+                    labelText: "Phone Number",
+                    errorText: showError && numberController.text.isEmpty
                         ? "Required"
                         : null,
                   ),
-                  keyboardType: TextInputType.emailAddress,
+                  keyboardType: TextInputType.phone,
                 ),
                 TextField(
                   controller: relationController,
@@ -137,7 +137,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (nameController.text.isEmpty ||
-                    emailController.text.isEmpty ||
+                    numberController.text.isEmpty ||
                     relationController.text.isEmpty) {
                   setState(() => showError = true);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -150,7 +150,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 if (contact == null) {
                   await _service.addEmergencyContact(
                     name: nameController.text,
-                    email: emailController.text,
+                    number: numberController.text,
                     relationship: relationController.text,
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -160,7 +160,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   await _service.updateEmergencyContact(
                     id: contact['id'],
                     name: nameController.text,
-                    email: emailController.text,
+                    number: numberController.text,
                     relationship: relationController.text,
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -264,11 +264,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 15),
             TextField(
-              controller: emailController,
+              controller: numberController,
               readOnly: true,
               decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.email),
+                labelText: 'Phone Number',
+                prefixIcon: Icon(Icons.phone),
                 border: OutlineInputBorder(),
               ),
             ),

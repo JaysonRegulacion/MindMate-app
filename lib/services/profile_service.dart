@@ -36,7 +36,20 @@ class ProfileService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
+    // 1. Update profiles table (source of truth)
     await _supabase.from('profiles').update(updates).eq('id', user.id);
+
+    // 2. Sync Supabase Auth metadata (IMPORTANT for HomeScreen)
+    await _supabase.auth.updateUser(
+      UserAttributes(
+        data: {
+          'first_name': firstName,
+          'last_name': lastName,
+          if (avatarUrl != null) 'avatar_url': avatarUrl,
+        },
+      ),
+    );
+    await _supabase.auth.refreshSession();
   }
 
   // ==============================
@@ -152,7 +165,7 @@ class ProfileService {
 
     final response = await _supabase
         .from('emergency_contacts')
-        .select('id, name, contact_email, relationship, created_at')
+        .select('id, name, contact_number, relationship, created_at')
         .eq('user_id', user.id)
         .order('created_at', ascending: true);
 
@@ -161,7 +174,7 @@ class ProfileService {
 
   Future<void> addEmergencyContact({
     required String name,
-    required String email,
+    required String number,
     required String relationship,
   }) async {
     final user = _supabase.auth.currentUser;
@@ -172,14 +185,14 @@ class ProfileService {
       throw Exception('You can only have up to 3 emergency contacts.');
     }
 
-    if (name.isEmpty || email.isEmpty || relationship.isEmpty) {
+    if (name.isEmpty || number.isEmpty || relationship.isEmpty) {
       throw Exception('Please fill in all contact fields.');
     }
 
     await _supabase.from('emergency_contacts').insert({
       'user_id': user.id,
       'name': name,
-      'contact_email': email,
+      'contact_number': number,
       'relationship': relationship,
     });
   }
@@ -188,15 +201,15 @@ class ProfileService {
     required String id,
     required String name,
     required String relationship,
-    required String email,
+    required String number,
   }) async {
-    if (name.isEmpty || email.isEmpty || relationship.isEmpty) {
+    if (name.isEmpty || number.isEmpty || relationship.isEmpty) {
       throw Exception('Please fill in all contact fields before saving.');
     }
 
     await _supabase.from('emergency_contacts').update({
       'name': name,
-      'contact_email': email,
+      'contact_number': number,
       'relationship': relationship,
     }).eq('id', id);
   }

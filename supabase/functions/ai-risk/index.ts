@@ -29,7 +29,7 @@ serve(async (req) => {
       You will receive a JSON object with user context (moods, journals, chats, and a set of extracted pattern flags).
       Your job is to produce exactly one JSON object ONLY with two fields:
       - "riskScore": number (0-10)
-      - "riskReason": short string (max 120 characters)
+      - "riskReason": complete short string (max 42 characters)
 
       Scoring rubric (use conservatively):
       0-2: Normal or mild stress — no cause for concern.
