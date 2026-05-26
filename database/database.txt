@@ -1,0 +1,7 @@
+Database Provider: Supabase
+Authentication: Supabase Auth
+Storage: Supabase Storage
+
+Included Files:
+ -credentials.txt
+ -schema.sql
