@@ -76,23 +76,6 @@ Supabase Database
 
 Mood Tracking and Emergency Notifications
 
-Repository Structure
-
-mindmate-capstone/
-│
-├── lib/
-├── android/
-├── assets/
-├── database/
-│   ├── database.txt
-│   ├── credentials.txt
-│   └── schema.sql
-│
-├── Documentation/
-│   └── AI-Documentation.txt
-│
-├── pubspec.yaml
-└── README.md
 
 Database
 
